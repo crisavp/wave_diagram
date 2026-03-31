@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breugem &amp; Holthuijsen Wave Growth Nomogram</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
+
+  /* ===== THEME VARIABLES ===== */
+  :root {
+    /* Dark theme (default) */
+    --bg-primary: #0a0e17;
+    --bg-card: #1a2235;
+    --bg-plot: #0f172a;
+    --bg-paper: #1a2235;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --accent-cyan: #06b6d4;
+    --accent-blue: #3b82f6;
+    --border: #1e293b;
+    --grid-major: #1e293b;
+    --grid-minor: #151d2e;
+    --color-wind: #ef4444;
+    --color-fetch: #22c55e;
+    --color-period: #3b82f6;
+    --color-marker: #fbbf24;
+    --overlay-bg: rgba(10, 14, 23, 0.7);
+  }
+
+  [data-theme="light"] {
+    --bg-primary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-plot: #ffffff;
+    --bg-paper: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --accent-cyan: #0891b2;
+    --accent-blue: #2563eb;
+    --border: #cbd5e1;
+    --grid-major: #cbd5e1;
+    --grid-minor: #e2e8f0;
+    --color-wind: #dc2626;
+    --color-fetch: #16a34a;
+    --color-period: #2563eb;
+    --color-marker: #d97706;
+    --overlay-bg: rgba(241, 245, 249, 0.7);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .header {
+    padding: 1rem 2rem 0.3rem;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .header .subtitle {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+    font-weight: 300;
+  }
+
+  /* ===== TOP BAR (depth + toggles) ===== */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    padding: 0.4rem 1.5rem 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .top-bar label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .top-bar input[type="range"] {
+    width: 300px;
+    max-width: 35vw;
+    accent-color: var(--accent-cyan);
+    cursor: pointer;
+  }
+
+  .depth-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    min-width: 110px;
+    text-align: center;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .btn-sm {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-sm:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .btn-sm.active {
+    border-color: var(--accent-cyan); color: var(--accent-cyan);
+    background: rgba(6, 182, 212, 0.1);
+  }
+
+  .separator {
+    width: 1px; height: 24px; background: var(--border); flex-shrink: 0;
+  }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main-container {
+    display: flex;
+    gap: 0;
+    padding: 0.4rem 1rem;
+    max-width: 1600px;
+    margin: 0 auto;
+    height: calc(100vh - 105px);
+  }
+
+  .chart-panel {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  #nomogram { width: 100%; height: 100%; }
+
+  .computing-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--overlay-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem; color: var(--accent-cyan);
+    z-index: 10; pointer-events: none;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .computing-overlay.visible { opacity: 1; }
+
+  .controls-panel {
+    width: 255px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding-left: 0.75rem;
+    overflow-y: auto;
+  }
+
+  .control-card {
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 0.75rem 0.9rem;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .control-card h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .legend-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 0.35rem; font-size: 0.82rem;
+  }
+  .legend-swatch { width: 22px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+
+  .input-group { margin-bottom: 0.5rem; }
+  .input-group label {
+    display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;
+  }
+  .input-group input[type="range"] { width: 100%; accent-color: var(--accent-blue); cursor: pointer; }
+  .value-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; color: var(--accent-cyan); font-weight: 600;
+  }
+
+  .result-box {
+    background: rgba(6, 182, 212, 0.06);
+    border: 1px solid rgba(6, 182, 212, 0.15);
+    border-radius: 8px; padding: 0.6rem; margin-top: 0.35rem;
+  }
+  .result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.78rem; margin-bottom: 0.25rem;
+  }
+  .result-row:last-child { margin-bottom: 0; }
+  .result-row .rlabel { color: var(--text-secondary); }
+  .result-row .rval {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-primary);
+  }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.35rem; font-size: 0.78rem;
+  }
+  .toggle-row input[type="checkbox"] { accent-color: var(--accent-blue); width: 15px; height: 15px; cursor: pointer; }
+
+  .info-text {
+    font-size: 0.7rem; color: var(--text-secondary); line-height: 1.45; margin-top: 0.3rem;
+  }
+
+  @media (max-width: 900px) {
+    .main-container { flex-direction: column; height: auto; }
+    .chart-panel { height: 55vh; }
+    .controls-panel { width: 100%; padding-left: 0; padding-top: 0.5rem; }
+    .top-bar input[type="range"] { width: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Breugem &amp; Holthuijsen Wave Growth Nomogram</h1>
+  <div class="subtitle">Deep &amp; Shallow Water &mdash; Interactive Edition with Variable Depth</div>
+</div>
+
+<div class="top-bar">
+  <label>Depth:</label>
+  <input type="range" id="depth-slider" min="5" max="500" value="500" step="1">
+  <div class="depth-display" id="depth-display">&infin; (Deep)</div>
+  <div class="btn-group" id="depth-presets">
+    <button class="btn-sm" onclick="setDepth(10)">10m</button>
+    <button class="btn-sm" onclick="setDepth(20)">20m</button>
+    <button class="btn-sm" onclick="setDepth(40)">40m</button>
+    <button class="btn-sm" onclick="setDepth(100)">100m</button>
+    <button class="btn-sm active" onclick="setDepth(500)">Deep</button>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="btn-group">
+    <button class="btn-sm active" id="btn-units-imp" onclick="setUnits('imperial')">kn / nm</button>
+    <button class="btn-sm" id="btn-units-si" onclick="setUnits('si')">m/s / km</button>
+  </div>
+
+  <div class="separator"></div>
+
+  <div class="btn-group">
+    <button class="btn-sm" id="btn-dark" onclick="setTheme('dark')">Dark</button>
+    <button class="btn-sm active" id="btn-light" onclick="setTheme('light')">Light / Print</button>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="chart-panel">
+    <div id="nomogram"></div>
+    <div class="computing-overlay" id="overlay">Recomputing...</div>
+  </div>
+
+  <div class="controls-panel">
+    <div class="control-card">
+      <h3>Legend</h3>
+      <div class="legend-row">
+        <div class="legend-swatch" id="sw-wind" style="background: var(--color-wind);"></div>
+        <span id="leg-wind">Wind Speed (knots)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch" id="sw-fetch" style="background: var(--color-fetch);"></div>
+        <span id="leg-fetch">Fetch (nautical miles)</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch" id="sw-period" style="background: var(--color-period);"></div>
+        <span>Peak Period (seconds)</span>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <h3>Point Calculator</h3>
+      <div class="input-group">
+        <label>Wind Speed: <span class="value-display" id="ws-val">30 kn</span></label>
+        <input type="range" id="windspeed" min="10" max="80" value="30" step="1">
+      </div>
+      <div class="input-group">
+        <label>Duration: <span class="value-display" id="dur-val">12 hr</span></label>
+        <input type="range" id="duration" min="1" max="96" value="12" step="0.5">
+      </div>
+      <div class="input-group">
+        <label>Fetch: <span class="value-display" id="fetch-val">120 nm</span></label>
+        <input type="range" id="fetch" min="5" max="1800" value="120" step="5">
+      </div>
+      <div class="result-box">
+        <div class="result-row">
+          <span class="rlabel">Sig. Wave Height</span>
+          <span class="rval" id="res-hs">&mdash;</span>
+        </div>
+        <div class="result-row">
+          <span class="rlabel">Peak Period</span>
+          <span class="rval" id="res-tp">&mdash;</span>
+        </div>
+        <div class="result-row">
+          <span class="rlabel">Limiting factor</span>
+          <span class="rval" id="res-limit">&mdash;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <h3>Display Options</h3>
+      <div class="toggle-row">
+        <span>Wind speed lines</span>
+        <input type="checkbox" id="show-wind" checked>
+      </div>
+      <div class="toggle-row">
+        <span>Fetch lines</span>
+        <input type="checkbox" id="show-fetch" checked>
+      </div>
+      <div class="toggle-row">
+        <span>Period lines</span>
+        <input type="checkbox" id="show-period" checked>
+      </div>
+    </div>
+
+    <div class="control-card">
+      <h3>Reference</h3>
+      <div class="info-text">
+        Breugem &amp; Holthuijsen (2007) generalized
+        shallow water growth curves (eqs. 19–20).<br>
+        Adapted from Merer (2008).<br><br>
+        Shallow water params:<br>
+        k&#x2083;=0.343 m&#x2083;=1.14<br>
+        k&#x2084;=0.10 &ensp;m&#x2084;=2.01
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// PHYSICS
+// ============================================================
+var G = 9.81;
+var H_INF = 0.24, K1 = 4.14e-4, M1 = 0.79, P = 0.572;
+var T_INF = 7.69, K2 = 2.77e-7, M2 = 1.45, Q = 0.187;
+var K3 = 0.343, M3 = 1.14;
+var K4 = 0.10,  M4 = 2.01;
+var KN = 0.5144, NM = 1852.0;
+
+function ndH(Ft, dt) {
+  if (dt > 1e6) return H_INF * Math.pow(Math.tanh(K1 * Math.pow(Ft, M1)), P);
+  var sl = Math.tanh(K3 * Math.pow(dt, M3));
+  return H_INF * Math.pow(sl * Math.tanh(K1 * Math.pow(Ft, M1) / sl), P);
+}
+
+function ndT(Ft, dt) {
+  if (dt > 1e6) return T_INF * Math.pow(Math.tanh(K2 * Math.pow(Ft, M2)), Q);
+  var sl = Math.tanh(K4 * Math.pow(dt, M4));
+  return T_INF * Math.pow(sl * Math.tanh(K2 * Math.pow(Ft, M2) / sl), Q);
+}
+
+function ndDur(Fmax, dt, steps) {
+  if (Fmax <= 1) return 0;
+  steps = steps || 300;
+  var logA = 0, logB = Math.log10(Fmax);
+  var dl = (logB - logA) / steps, s = 0;
+  for (var i = 0; i < steps; i++) {
+    var fa = Math.pow(10, logA + i * dl), fb = Math.pow(10, logA + (i+1) * dl);
+    var ta = ndT(fa, dt), tb = ndT(fb, dt);
+    if (ta > 0 && tb > 0) s += (fb - fa) * 0.5 * (1/ta + 1/tb);
+  }
+  return 4 * Math.PI * s;
+}
+
+// Fully developed T~ limit for a given nondimensional depth
+function maxTtilde(dt) {
+  if (dt > 1e6) return T_INF;
+  return T_INF * Math.pow(Math.tanh(K4 * Math.pow(dt, M4)), Q);
+}
+
+// ============================================================
+// STATE
+// ============================================================
+var currentDepth = 500;
+var currentUnits = 'imperial';  // 'imperial' = kn/nm, 'si' = m-s/km
+var currentTheme = 'light';
+var currentTraces = null;
+
+// Contour values (always in knots/nm internally)
+var windSpeeds = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80];
+var mainWinds = new Set([10, 20, 30, 40, 50, 60, 70, 80]);
+var fetchValues = [5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180,
+                   240, 300, 360, 480, 600, 900, 1200, 1500, 1800];
+var mainFetches = new Set([10, 30, 60, 120, 300, 600, 1200]);
+var periodValues = [];
+for (var i = 3; i <= 25; i++) periodValues.push(i);
+var mainPeriods = new Set([5, 8, 10, 12, 15, 20, 25]);
+
+// Fetch array
+var Nf = 500;
+var Ftilde = new Float64Array(Nf);
+for (var i = 0; i < Nf; i++) Ftilde[i] = Math.pow(10, i * 7.0 / (Nf - 1));
+
+// ============================================================
+// THEME COLORS
+// ============================================================
+function themeColors() {
+  var dark = currentTheme === 'dark';
+  return {
+    wind:   dark ? '#ef4444' : '#dc2626',
+    fetch:  dark ? '#22c55e' : '#16a34a',
+    period: dark ? '#3b82f6' : '#2563eb',
+    marker: dark ? '#fbbf24' : '#d97706',
+    paper:  dark ? '#1a2235' : '#ffffff',
+    plot:   dark ? '#0f172a' : '#ffffff',
+    font:   dark ? '#e2e8f0' : '#1e293b',
+    grid:   dark ? '#1e293b' : '#cbd5e1',
+    gridM:  dark ? '#151d2e' : '#e2e8f0',
+  };
+}
+
+// ============================================================
+// UNIT FORMATTING
+// ============================================================
+function wsLabel(ws_kn) {
+  if (currentUnits === 'si') return (ws_kn * KN).toFixed(1) + ' m/s';
+  return ws_kn + ' kn';
+}
+function wsValue(ws_kn) {
+  if (currentUnits === 'si') return (ws_kn * KN).toFixed(1);
+  return '' + ws_kn;
+}
+function fetchLabel(f_nm) {
+  if (currentUnits === 'si') return Math.round(f_nm * NM / 1000) + ' km';
+  return f_nm + ' nm';
+}
+function fetchValue(f_nm) {
+  if (currentUnits === 'si') return '' + Math.round(f_nm * NM / 1000);
+  return '' + f_nm;
+}
+
+// ============================================================
+// BUILD TRACES
+// ============================================================
+function buildTraces(depth_m) {
+  var traces = [];
+  var c = themeColors();
+  var showWind = document.getElementById('show-wind').checked;
+  var showFetch = document.getElementById('show-fetch').checked;
+  var showPeriod = document.getElementById('show-period').checked;
+
+  // --- Wind speed isotachs (red) ---
+  for (var wi = 0; wi < windSpeeds.length; wi++) {
+    var ws = windSpeeds[wi];
+    var U10 = ws * KN;
+    var dt = G * depth_m / (U10 * U10);
+    var xArr = [], yArr = [];
+
+    for (var j = 0; j < Nf; j++) {
+      var Ht = ndH(Ftilde[j], dt);
+      var dur_nd = ndDur(Ftilde[j], dt, 150);
+      var H_m = (U10 * U10 / G) * Ht;
+      var dur_hr = (U10 / G) * dur_nd / 3600;
+      if (H_m > 0.3 && dur_hr > 0.5 && dur_hr < 100 && H_m < 40) {
+        xArr.push(dur_hr); yArr.push(H_m);
+      }
+    }
+
+    if (xArr.length > 2) {
+      var isMain = mainWinds.has(ws);
+      traces.push({
+        x: xArr, y: yArr,
+        type: 'scatter', mode: 'lines',
+        line: { color: c.wind, width: isMain ? 2.2 : 1.2 },
+        name: wsLabel(ws),
+        hovertemplate: 'Wind: ' + wsLabel(ws) + '<br>Duration: %{x:.1f} hr<br>Hs: %{y:.2f} m<extra></extra>',
+        showlegend: false, legendgroup: 'wind', visible: showWind,
+      });
+      if (isMain) {
+        var idx = Math.floor(xArr.length * 0.999);
+        traces.push({
+          x: [xArr[idx] * 1],
+          y: [yArr[idx] * 1.05],
+          type: 'scatter',
+          mode: 'text',
+          text: [wsValue(ws)],
+          textposition: 'middle left',
+          textfont: { color: c.wind, size: 11, family: 'JetBrains Mono, monospace' },
+          showlegend: false,
+          hoverinfo: 'skip',
+          legendgroup: 'wind',
+          visible: showWind,
+        });
+      }
+    }
+  }
+
+  // --- Fetch contours (green) ---
+  for (var fi = 0; fi < fetchValues.length; fi++) {
+    var fnm = fetchValues[fi];
+    var fm = fnm * NM;
+    var xArr = [], yArr = [];
+
+    for (var ws = 5; ws <= 80; ws += 0.5) {
+      var U10 = ws * KN;
+      var dt = G * depth_m / (U10 * U10);
+      var Ft = fm / (U10 * U10 / G);
+      var Ht = ndH(Ft, dt);
+      var dur_nd = ndDur(Ft, dt, 150);
+      var H_m = (U10 * U10 / G) * Ht;
+      var dur_hr = (U10 / G) * dur_nd / 3600;
+      if (H_m > 0.3 && dur_hr > 0.5 && dur_hr < 100 && H_m < 40) {
+        xArr.push(dur_hr); yArr.push(H_m);
+      }
+    }
+
+    if (xArr.length > 2) {
+      var isMain = mainFetches.has(fnm);
+      traces.push({
+        x: xArr, y: yArr,
+        type: 'scatter', mode: 'lines',
+        line: { color: c.fetch, width: isMain ? 2.0 : 1.1 },
+        name: fetchLabel(fnm),
+        hovertemplate: 'Fetch: ' + fetchLabel(fnm) + '<br>Duration: %{x:.1f} hr<br>Hs: %{y:.2f} m<extra></extra>',
+        showlegend: false, legendgroup: 'fetch', visible: showFetch,
+      });
+      if (isMain && yArr.length > 5) {
+        var idx = Math.floor(yArr.length * 0.9999);
+        traces.push({
+          x: [xArr[idx]], y: [yArr[idx]],
+          type: 'scatter', mode: 'text',
+          text: [fetchValue(fnm)],
+          textposition: 'top center',
+          textfont: { color: c.fetch, size: 10, family: 'JetBrains Mono, monospace' },
+          showlegend: false, hoverinfo: 'skip', legendgroup: 'fetch', visible: showFetch,
+        });
+      }
+    }
+  }
+
+  // --- Peak period contours (blue) ---
+  // Each period line: sweep wind speed from HIGH (80+ kn, top-left = high Hs,
+  // short duration) down to the minimum wind that can produce this period
+  // (bottom-right = low Hs, long duration near fully-developed).
+  // The minimum wind speed for period T is U10_min = T*g/T_inf_eff.
+  for (var pi = 0; pi < periodValues.length; pi++) {
+    var T_target = periodValues[pi];
+    var xArr = [], yArr = [];
+
+    // Sweep from high wind speeds down to low
+    // Use non-uniform spacing: coarse at high ws, fine near the limit
+    var wsArr = [];
+    // High wind speeds (top-left of line)
+    for (var ws = 80; ws > 20; ws -= 0.5) wsArr.push(ws);
+    // Fine resolution at low wind speeds (right extension)
+    for (var ws = 20; ws >= 2; ws -= 0.1) wsArr.push(ws);
+
+    for (var wi2 = 0; wi2 < wsArr.length; wi2++) {
+      var ws = wsArr[wi2];
+      var U10 = ws * KN;
+      var dt = G * depth_m / (U10 * U10);
+      var Tt_target = T_target * G / U10;
+
+      var mT = maxTtilde(dt);
+      if (Tt_target >= mT * 0.99995) continue;
+      if (Tt_target <= 0.001) continue;
+
+      // Binary search for Ftilde
+      var lo = 0.1, hi = 1e9;
+      for (var iter = 0; iter < 100; iter++) {
+        var mid = Math.sqrt(lo * hi);
+        if (ndT(mid, dt) < Tt_target) lo = mid; else hi = mid;
+      }
+      var Ft = Math.sqrt(lo * hi);
+      var Ht = ndH(Ft, dt);
+      var dur_nd = ndDur(Ft, dt, 200);
+      var H_m = (U10 * U10 / G) * Ht;
+      var dur_hr = (U10 / G) * dur_nd / 3600;
+
+      if (dur_hr >= 0.5 && dur_hr <= 100 && H_m >= 0.3 && H_m <= 40) {
+        xArr.push(dur_hr); yArr.push(H_m);
+      }
+    }
+
+    if (xArr.length > 2) {
+      var isMain = mainPeriods.has(T_target);
+      traces.push({
+        x: xArr, y: yArr,
+        type: 'scatter', mode: 'lines',
+        line: { color: c.period, width: isMain ? 2.0 : 1.0,
+                dash: T_target <= 4 ? 'dot' : 'solid' },
+        name: T_target + ' s',
+        hovertemplate: 'Period: ' + T_target + ' s<br>Duration: %{x:.1f} hr<br>Hs: %{y:.2f} m<extra></extra>',
+        showlegend: false, legendgroup: 'period', visible: showPeriod,
+      });
+      if (isMain && yArr.length > 5) {
+        var idx = Math.floor(yArr.length * 0.55);
+        traces.push({
+          x: [xArr[idx]], y: [yArr[idx] * 0.98],
+          type: 'scatter', mode: 'text',
+          text: [T_target + 's'],
+          textposition: 'bottom right',
+          textfont: { color: c.period, size: 10, family: 'JetBrains Mono, monospace' },
+          showlegend: false, hoverinfo: 'skip', legendgroup: 'period', visible: showPeriod,
+        });
+      }
+    }
+  }
+
+  // Calculator marker
+  traces.push({
+    x: [], y: [],
+    type: 'scatter', mode: 'markers',
+    marker: { color: c.marker, size: 12, symbol: 'diamond', line: { color: currentTheme === 'dark' ? '#fff' : '#000', width: 2 } },
+    showlegend: false,
+    hovertemplate: 'Hs: %{y:.2f} m<br>Duration: %{x:.1f} hr<extra>Calc</extra>',
+  });
+
+  return traces;
+}
+
+// ============================================================
+// LAYOUT
+// ============================================================
+function buildLayout() {
+  var c = themeColors();
+  var wsUnit = currentUnits === 'si' ? 'm/s' : 'knots';
+  var fUnit = currentUnits === 'si' ? 'km' : 'nm';
+
+  return {
+    paper_bgcolor: c.paper,
+    plot_bgcolor: c.plot,
+    font: { family: 'Source Sans 3, sans-serif', color: c.font },
+    margin: { l: 70, r: 50, t: 30, b: 60 },
+    xaxis: {
+      type: 'log',
+      title: { text: 'Wind Duration (hours)', font: { size: 14 } },
+      range: [Math.log10(0.8), Math.log10(100)],
+      gridcolor: c.grid,
+      tickvals: [1,2,3,6,9,12,18,24,30,36,42,48,60,72,96],
+      ticktext: ['1','2','3','6','9','12','18','24','30','36','42','48','60','72','96'],
+      minor: { showgrid: true, gridcolor: c.gridM },
+      zeroline: false,
+    },
+    yaxis: {
+      type: 'log',
+      title: { text: 'Significant Wave Height H\u2081/\u2083 (m)', font: { size: 14 } },
+      range: [Math.log10(0.5), Math.log10(42)],
+      gridcolor: c.grid,
+      tickvals: [0.5,0.6,0.8,1,1.5,2,3,4,5,6,7,8,9,10,12,14,16,18,20,25,30],
+      ticktext: ['0.5','0.6','0.8','1','1.5','2','3','4','5','6','7','8','9','10','12','14','16','18','20','25','30'],
+      minor: { showgrid: true, gridcolor: c.gridM },
+      zeroline: false,
+    },
+    hovermode: 'closest',
+    showlegend: false,
+    annotations: [{
+      text: '<b style="color:' + c.wind + '">Wind Speed (' + wsUnit + ')</b> &nbsp; ' +
+            '<b style="color:' + c.fetch + '">Fetch (' + fUnit + ')</b> &nbsp; ' +
+            '<b style="color:' + c.period + '">Peak Period (s)</b>',
+      xref: 'paper', yref: 'paper',
+      x: 0.01, y: 1.02, showarrow: false,
+      font: { size: 11 },
+    }],
+  };
+}
+
+var plotConfig = {
+  responsive: true, displayModeBar: true,
+  modeBarButtonsToRemove: ['lasso2d', 'select2d'], displaylogo: false,
+};
+
+// ============================================================
+// REPLOT
+// ============================================================
+function replot() {
+  var overlay = document.getElementById('overlay');
+  overlay.classList.add('visible');
+  setTimeout(function() {
+    currentTraces = buildTraces(currentDepth);
+    Plotly.react('nomogram', currentTraces, buildLayout(), plotConfig);
+    overlay.classList.remove('visible');
+    updateCalculator();
+  }, 30);
+}
+
+// ============================================================
+// DEPTH CONTROLS
+// ============================================================
+var depthSlider = document.getElementById('depth-slider');
+var depthDisplay = document.getElementById('depth-display');
+var debounce = null;
+
+depthSlider.addEventListener('input', function() {
+  currentDepth = parseInt(this.value);
+  depthDisplay.textContent = currentDepth >= 500 ? '\u221E (Deep)' : currentDepth + ' m';
+  document.querySelectorAll('#depth-presets .btn-sm').forEach(function(b){b.classList.remove('active');});
+  clearTimeout(debounce);
+  debounce = setTimeout(replot, 180);
+});
+
+function setDepth(d) {
+  currentDepth = d; depthSlider.value = d;
+  depthDisplay.textContent = d >= 500 ? '\u221E (Deep)' : d + ' m';
+  document.querySelectorAll('#depth-presets .btn-sm').forEach(function(b){
+    b.classList.toggle('active', parseInt(b.textContent) === d || (d >= 500 && b.textContent === 'Deep'));
+  });
+  replot();
+}
+
+// ============================================================
+// UNITS TOGGLE
+// ============================================================
+function setUnits(u) {
+  currentUnits = u;
+  document.getElementById('btn-units-imp').classList.toggle('active', u === 'imperial');
+  document.getElementById('btn-units-si').classList.toggle('active', u === 'si');
+  document.getElementById('leg-wind').textContent = u === 'si' ? 'Wind Speed (m/s)' : 'Wind Speed (knots)';
+  document.getElementById('leg-fetch').textContent = u === 'si' ? 'Fetch (km)' : 'Fetch (nautical miles)';
+  replot();
+}
+
+// ============================================================
+// THEME TOGGLE
+// ============================================================
+function setTheme(t) {
+  currentTheme = t;
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('btn-dark').classList.toggle('active', t === 'dark');
+  document.getElementById('btn-light').classList.toggle('active', t === 'light');
+  // Update legend swatches
+  var c = themeColors();
+  document.getElementById('sw-wind').style.background = c.wind;
+  document.getElementById('sw-fetch').style.background = c.fetch;
+  document.getElementById('sw-period').style.background = c.period;
+  replot();
+}
+
+// ============================================================
+// CALCULATOR
+// ============================================================
+function updateCalculator() {
+  var ws_kn = parseFloat(document.getElementById('windspeed').value);
+  var dur = parseFloat(document.getElementById('duration').value);
+  var fetch_nm = parseFloat(document.getElementById('fetch').value);
+
+  document.getElementById('ws-val').textContent = wsLabel(ws_kn);
+  document.getElementById('dur-val').textContent = dur + ' hr';
+  document.getElementById('fetch-val').textContent = fetchLabel(fetch_nm);
+
+  var U10 = ws_kn * KN;
+  var dt = G * currentDepth / (U10 * U10);
+  var fm = fetch_nm * NM;
+
+  // Fetch-limited
+  var FtF = fm / (U10 * U10 / G);
+  var H_fetch = (U10 * U10 / G) * ndH(FtF, dt);
+  var T_fetch = (U10 / G) * ndT(FtF, dt);
+
+  // Duration-limited
+  var tTarget = dur * 3600 * G / U10;
+  var lo = 1, hi = 1e8;
+  for (var i = 0; i < 80; i++) {
+    var mid = Math.sqrt(lo * hi);
+    if (ndDur(mid, dt, 80) < tTarget) lo = mid; else hi = mid;
+  }
+  var FtD = Math.sqrt(lo * hi);
+  var H_dur = (U10 * U10 / G) * ndH(FtD, dt);
+  var T_dur = (U10 / G) * ndT(FtD, dt);
+
+  var H, T, lim;
+  if (H_fetch < H_dur) { H = H_fetch; T = T_fetch; lim = 'Fetch-limited'; }
+  else { H = H_dur; T = T_dur; lim = 'Duration-limited'; }
+
+  if (currentDepth < 500) {
+    var Hmax = (U10*U10/G) * H_INF * Math.pow(Math.tanh(K3 * Math.pow(dt, M3)), P);
+    if (H > Hmax) { H = Hmax; lim = 'Depth-limited'; }
+  }
+
+  document.getElementById('res-hs').textContent = H.toFixed(2) + ' m';
+  document.getElementById('res-tp').textContent = T.toFixed(1) + ' s';
+  document.getElementById('res-limit').textContent = lim;
+
+  if (currentTraces) {
+    Plotly.restyle('nomogram', { x: [[dur]], y: [[H]] }, [currentTraces.length - 1]);
+  }
+}
+
+['windspeed','duration','fetch'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', updateCalculator);
+});
+['show-wind','show-fetch','show-period'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', replot);
+});
+
+// ============================================================
+// INIT
+// ============================================================
+replot();
+window.addEventListener('resize', function() { Plotly.Plots.resize('nomogram'); });
+</script>
+</body>
+</html>
